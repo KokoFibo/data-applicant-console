@@ -1,0 +1,92 @@
+---
+import Icon from './Icon.astro'
+import { MULTI_KEYS, GROUP_LABEL, activeCount } from '../lib/filters'
+import type { Filters, MultiKey } from '../lib/filters'
+import type { MetaResponse } from '../lib/api'
+import { num } from '../lib/format'
+
+interface Props {
+  filters: Filters
+  meta: MetaResponse
+}
+const { filters, meta } = Astro.props
+
+// Opsi tiap kelompok. Perusahaan berasal dari daftar perusahaan, sisanya dari data yang ada beserta jumlahnya.
+const companyOptions = meta.companies.map((c) => ({ value: c.code, label: c.name, n: undefined as number | undefined }))
+if (meta.unassigned > 0) companyOptions.push({ value: '_none', label: 'Belum ditentukan', n: meta.unassigned })
+
+const groups = MULTI_KEYS.map((key) => ({
+  key,
+  title: GROUP_LABEL[key],
+  options: key === 'company' ? companyOptions : (meta.facets[key] ?? []).map((o) => ({ value: o.value, label: o.label, n: o.n as number | undefined })),
+})).filter((g) => g.options.length > 0)
+const active = activeCount(filters)
+---
+
+<aside class="card filters" aria-label="Filter pelamar">
+  <form id="f" method="get" action="/applicants">
+    <div class="filters-head">
+      <h2>Filter</h2>
+      {active > 0 && <a class="link" href="/applicants">Reset ({active})</a>}
+    </div>
+
+    <details class="facet" open>
+      <summary>Status pengiriman</summary>
+      <div class="facet-body">
+        <label class="check"><input type="radio" name="status" value="" checked={filters.status === ''} /><span>Semua</span></label>
+        <label class="check"><input type="radio" name="status" value="sent" checked={filters.status === 'sent'} /><span>Sudah dikirim</span></label>
+        <label class="check"><input type="radio" name="status" value="draft" checked={filters.status === 'draft'} /><span>Belum dikirim</span></label>
+      </div>
+    </details>
+
+    {groups.map((g, idx) => (
+      <details class="facet" open={idx < 3 || filters.multi[g.key as MultiKey].length > 0}>
+        <summary>{g.title}{filters.multi[g.key as MultiKey].length > 0 && <span class="badge b-sent">{filters.multi[g.key as MultiKey].length}</span>}</summary>
+        <div class="facet-body">
+          {g.options.map((o) => (
+            <label class="check">
+              <input type="checkbox" name={g.key} value={o.value} checked={filters.multi[g.key as MultiKey].includes(o.value)} />
+              <span>{o.label}</span>
+              {o.n !== undefined && <em>{num(o.n)}</em>}
+            </label>
+          ))}
+        </div>
+      </details>
+    ))}
+
+    <details class="facet" open={Boolean(filters.min_age || filters.max_age)}>
+      <summary>Umur (tahun)</summary>
+      <div class="range">
+        <input class="input" type="number" name="min_age" min="15" max="99" placeholder="Min" value={filters.min_age} aria-label="Umur minimum" />
+        <input class="input" type="number" name="max_age" min="15" max="99" placeholder="Maks" value={filters.max_age} aria-label="Umur maksimum" />
+      </div>
+    </details>
+
+    <details class="facet" open={Boolean(filters.from || filters.to)}>
+      <summary>Tanggal mendaftar</summary>
+      <div class="range">
+        <input class="input" type="date" name="from" value={filters.from} aria-label="Dari tanggal" />
+        <input class="input" type="date" name="to" value={filters.to} aria-label="Sampai tanggal" />
+      </div>
+    </details>
+
+    <details class="facet" open={filters.verified !== ''}>
+      <summary>Verifikasi email</summary>
+      <div class="facet-body">
+        <label class="check"><input type="radio" name="verified" value="" checked={filters.verified === ''} /><span>Semua</span></label>
+        <label class="check"><input type="radio" name="verified" value="yes" checked={filters.verified === 'yes'} /><span>Sudah terverifikasi</span></label>
+        <label class="check"><input type="radio" name="verified" value="no" checked={filters.verified === 'no'} /><span>Belum verifikasi</span></label>
+      </div>
+    </details>
+
+    <button class="btn btn-primary btn-block" type="submit" style="margin-top:0.75rem"><Icon name="filter" size={16} /> Terapkan filter</button>
+  </form>
+</aside>
+
+<script>
+  // Filter langsung diterapkan saat pilihan diubah (kolom pencarian tetap lewat Enter).
+  document.addEventListener('change', (event) => {
+    const el = event.target as HTMLInputElement | HTMLSelectElement | null
+    if (el && el.form && el.form.id === 'f' && el.type !== 'search' && el.type !== 'text') el.form.requestSubmit()
+  })
+</script>

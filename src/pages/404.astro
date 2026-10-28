@@ -1,0 +1,12 @@
+---
+import AppLayout from '../layouts/AppLayout.astro'
+Astro.response.status = 404
+---
+
+<AppLayout title="Tidak ditemukan" active="dashboard">
+  <div class="empty card card-pad">
+    <h1>Halaman tidak ditemukan</h1>
+    <p class="muted">Alamat yang Anda buka tidak ada atau datanya sudah dihapus.</p>
+    <a class="btn btn-primary" href="/">Kembali ke dasbor</a>
+  </div>
+</AppLayout>

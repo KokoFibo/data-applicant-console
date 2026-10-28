@@ -1,0 +1,45 @@
+---
+import Base from './Base.astro'
+import Icon from '../components/Icon.astro'
+
+interface Props {
+  title: string
+  active: 'dashboard' | 'applicants'
+}
+const { title, active } = Astro.props
+const email = Astro.locals.user?.email ?? ''
+---
+
+<Base title={`${title} · Konsol Pelamar`}>
+  <div class="shell">
+    <input type="checkbox" id="navtoggle" class="sr-only" aria-label="Buka atau tutup menu" />
+
+    <aside class="sidebar">
+      <a class="brand" href="/">
+        <span class="brand-mark"><img src="/logo.png" alt="" width="28" height="28" /></span>
+        <span class="brand-text"><strong>Konsol Pelamar</strong><small>Data calon karyawan</small></span>
+      </a>
+
+      <nav class="nav" aria-label="Menu utama">
+        <a href="/" aria-current={active === 'dashboard' ? 'page' : undefined}><Icon name="home" /> Dasbor</a>
+        <a href="/applicants" aria-current={active === 'applicants' ? 'page' : undefined}><Icon name="users" /> Pelamar</a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="who"><span class="avatar sm">{(email[0] ?? '?').toUpperCase()}</span><span title={email}>{email}</span></div>
+        <form method="post" action="/logout"><button class="btn-nav" type="submit"><Icon name="logout" /> Keluar</button></form>
+      </div>
+    </aside>
+    <label class="scrim" for="navtoggle"></label>
+
+    <div class="main">
+      <header class="topbar">
+        <label for="navtoggle" class="menu-btn" aria-label="Menu"><Icon name="menu" size={20} /></label>
+        <span class="topbar-title">{title}</span>
+      </header>
+      <main class="page">
+        <slot />
+      </main>
+    </div>
+  </div>
+</Base>

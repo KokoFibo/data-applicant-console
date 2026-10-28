@@ -1,0 +1,34 @@
+---
+import { num, pct } from '../lib/format'
+interface Props {
+  items: { label: string; n: number }[]
+  centerLabel?: string
+}
+const { items, centerLabel = 'total' } = Astro.props
+const palette = ['var(--c0)', 'var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)']
+const total = items.reduce((a, i) => a + i.n, 0)
+let acc = 0
+const segments = items.map((it, i) => {
+  const share = total ? (it.n / total) * 100 : 0
+  const seg = { ...it, share, offset: 25 - acc, color: palette[i % palette.length] }
+  acc += share
+  return seg
+})
+---
+
+<div class="donut-wrap">
+  <svg class="donut" viewBox="0 0 42 42" role="img" aria-label={`Komposisi: ${items.map((i) => `${i.label} ${i.n}`).join(', ')}`}>
+    <circle class="ring" cx="21" cy="21" r="15.9155" />
+    {segments.map((s) => s.share > 0 && (
+      <circle cx="21" cy="21" r="15.9155" stroke={s.color} stroke-dasharray={`${Math.max(s.share - 0.6, 0.1)} ${100 - Math.max(s.share - 0.6, 0.1)}`} stroke-dashoffset={s.offset} />
+    ))}
+    <text x="21" y="22.5" font-size="7" font-weight="700" fill="#111a24">{num(total)}</text>
+    <text x="21" y="28" font-size="2.8" fill="#5b6a7b">{centerLabel}</text>
+  </svg>
+  <ul class="legend">
+    {segments.map((s) => (
+      <li style={`--dot:${s.color}`}><i></i>{s.label}<b>{num(s.n)} <span class="muted" style="font-weight:500">({pct(s.n, total)}%)</span></b></li>
+    ))}
+    {segments.length === 0 && <li class="muted">Belum ada data.</li>}
+  </ul>
+</div>

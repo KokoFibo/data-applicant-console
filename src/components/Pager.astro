@@ -1,0 +1,30 @@
+---
+import Icon from './Icon.astro'
+import { patch, toQuery } from '../lib/filters'
+import type { Filters } from '../lib/filters'
+interface Props {
+  filters: Filters
+  current: number
+  last: number
+}
+const { filters, current, last } = Astro.props
+const href = (page: number) => `/applicants${toQuery(patch(filters, { page }))}`
+
+const pages: (number | '…')[] = []
+for (let p = 1; p <= last; p++) {
+  if (p === 1 || p === last || Math.abs(p - current) <= 1) pages.push(p)
+  else if (pages[pages.length - 1] !== '…') pages.push('…')
+}
+---
+
+{last > 1 && (
+  <nav class="pager" aria-label="Halaman">
+    {current > 1 ? <a href={href(current - 1)} aria-label="Sebelumnya"><Icon name="left" size={16} /></a> : <span class="off"><Icon name="left" size={16} /></span>}
+    {pages.map((p) => p === '…'
+      ? <span class="gap">…</span>
+      : p === current
+        ? <span class="on" aria-current="page">{p}</span>
+        : <a href={href(p)}>{p}</a>)}
+    {current < last ? <a href={href(current + 1)} aria-label="Berikutnya"><Icon name="right" size={16} /></a> : <span class="off"><Icon name="right" size={16} /></span>}
+  </nav>
+)}

@@ -1,0 +1,156 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro'
+import Icon from '../../components/Icon.astro'
+import CompanyChip from '../../components/CompanyChip.astro'
+import StatusBadge from '../../components/StatusBadge.astro'
+import { getEnv } from '../../lib/env'
+import { getApplicant, ApiError } from '../../lib/api'
+import type { Detail, FileItem } from '../../lib/api'
+import { dateText, dateTimeText, initials, hueOf, maskId, waLink } from '../../lib/format'
+
+const { id } = Astro.params
+if (!id || !/^\d{1,10}$/.test(id)) return Astro.rewrite('/404')
+
+const env = getEnv(Astro.locals)
+let a: Detail | undefined
+let files: FileItem[] = []
+let error = ''
+
+try {
+  const res = await getApplicant(env, Number(id))
+  a = res.applicant
+  files = res.files
+} catch (e) {
+  if (e instanceof ApiError && e.status === 404) return Astro.rewrite('/404')
+  error = e instanceof ApiError ? e.message : 'Terjadi kesalahan tak terduga saat memuat data.'
+}
+
+const wa = a ? waLink(a.hp) : null
+const show = (v?: string | null) => (v && v.trim() ? v : '-')
+---
+
+<AppLayout title={a?.nama ?? 'Detail pelamar'} active="applicants">
+  <div class="page-head">
+    <a class="btn btn-sm" href="/applicants"><Icon name="left" size={14} /> Kembali ke daftar</a>
+  </div>
+
+  {error && <div class="alert alert-error" role="alert"><strong>Data tidak dapat dimuat.</strong> {error}</div>}
+
+  {a && (
+    <>
+      <section class="card profile-head">
+        <span class="avatar lg" style={`--h:${a.company ? hueOf(a.company.code) : 200}`}>{initials(a.nama ?? a.email)}</span>
+        <div class="grow">
+          <h1>{a.nama ?? 'Belum mengisi nama'}</h1>
+          <div class="tags">
+            <CompanyChip company={a.company} />
+            <StatusBadge status={a.status} />
+            <span class={`badge ${a.email_verified ? 'b-yes' : 'b-no'}`}>{a.email_verified ? 'Email terverifikasi' : 'Email belum verifikasi'}</span>
+          </div>
+          <p class="muted">Mendaftar {dateTimeText(a.created_at)}</p>
+        </div>
+        <div class="contact-btns">
+          {wa && <a class="btn btn-accent" href={wa} target="_blank" rel="noopener noreferrer"><Icon name="phone" size={16} /> WhatsApp</a>}
+          <a class="btn" href={`mailto:${a.email}`}><Icon name="mail" size={16} /> Email</a>
+        </div>
+      </section>
+
+      <div class="detail-grid">
+        <div class="stack">
+          <section class="card card-pad">
+            <div class="card-head"><h2>Data pribadi</h2></div>
+            <dl class="dl">
+              <div><dt>Email</dt><dd>{a.email}</dd></div>
+              <div><dt>No. HP</dt><dd>{show(a.hp)}</dd></div>
+              <div><dt>No. telepon</dt><dd>{show(a.telp)}</dd></div>
+              <div><dt>Tempat, tanggal lahir</dt><dd>{show(a.tempat_lahir)}, {dateText(a.tgl_lahir)}{a.umur !== null ? ` (${a.umur} th)` : ''}</dd></div>
+              <div><dt>Jenis kelamin</dt><dd>{show(a.gender)}</dd></div>
+              <div><dt>Status pernikahan</dt><dd>{show(a.status_pernikahan)}</dd></div>
+              <div><dt>Agama</dt><dd>{show(a.agama)}</dd></div>
+              <div><dt>Etnis</dt><dd>{show(a.etnis)}</dd></div>
+              <div><dt>Golongan darah</dt><dd>{show(a.golongan_darah)}</dd></div>
+              <div><dt>Status PTKP</dt><dd>{show(a.ptkp)}</dd></div>
+            </dl>
+          </section>
+
+          <section class="card card-pad">
+            <div class="card-head"><h2>Identitas dan alamat</h2></div>
+            <dl class="dl">
+              <div><dt>Jenis identitas</dt><dd>{show(a.jenis_identitas)}</dd></div>
+              <div>
+                <dt>No. identitas</dt>
+                <dd class="secret">
+                  <input type="checkbox" id="reveal" class="sr-only" aria-label="Tampilkan nomor identitas" />
+                  <span class="masked mono">{maskId(a.no_identitas)}</span>
+                  <span class="clear mono">{show(a.no_identitas)}</span>
+                  {a.no_identitas && (
+                    <>
+                      <label for="reveal" class="link show-label">Tampilkan</label>
+                      <label for="reveal" class="link hide-label">Sembunyikan</label>
+                    </>
+                  )}
+                </dd>
+              </div>
+              <div class="wide"><dt>Alamat sesuai identitas</dt><dd>{show(a.alamat_identitas)}</dd></div>
+              <div class="wide"><dt>Alamat tinggal sekarang</dt><dd>{show(a.alamat_tinggal_sekarang)}</dd></div>
+            </dl>
+          </section>
+
+          <section class="card card-pad">
+            <div class="card-head"><h2>Pendidikan</h2></div>
+            <dl class="dl">
+              <div><dt>Pendidikan terakhir</dt><dd>{show(a.pendidikan)}</dd></div>
+              <div><dt>Jurusan</dt><dd>{show(a.jurusan)}</dd></div>
+              <div class="wide"><dt>Sekolah / kampus</dt><dd>{show(a.nama_kampus)}</dd></div>
+            </dl>
+          </section>
+
+          <section class="card card-pad">
+            <div class="card-head"><h2>Kontak darurat</h2></div>
+            <dl class="dl">
+              <div><dt>Kontak 1</dt><dd>{show(a.nama_contact_darurat)} <span class="muted">({show(a.hubungan_1)})</span></dd></div>
+              <div><dt>No. HP kontak 1</dt><dd>{show(a.contact_darurat_1)}</dd></div>
+              <div><dt>Kontak 2</dt><dd>{show(a.nama_contact_darurat_2)} <span class="muted">({show(a.hubungan_2)})</span></dd></div>
+              <div><dt>No. HP kontak 2</dt><dd>{show(a.contact_darurat_2)}</dd></div>
+            </dl>
+          </section>
+        </div>
+
+        <div class="stack">
+          <section class="card card-pad">
+            <div class="card-head"><h2>Dokumen</h2><span class="muted">{files.length} file</span></div>
+            {files.length === 0 ? (
+              <p class="muted">Belum ada dokumen yang diunggah.</p>
+            ) : (
+              <div class="docs">
+                {files.map((f) => (
+                  f.url ? (
+                    <a class="doc" href={f.url} target="_blank" rel="noopener noreferrer" title={`Buka ${f.label}`}>
+                      <div class="doc-img"><img src={f.url} alt={`${f.label}: ${f.original_name}`} loading="lazy" referrerpolicy="no-referrer" /></div>
+                      <div class="doc-cap"><strong>{f.label}</strong><span>{f.original_name}</span></div>
+                    </a>
+                  ) : (
+                    <div class="doc">
+                      <div class="doc-img"><Icon name="image" size={28} /></div>
+                      <div class="doc-cap"><strong>{f.label}</strong><span>Tautan tidak tersedia</span></div>
+                    </div>
+                  )
+                ))}
+              </div>
+            )}
+            <p class="muted" style="margin-top:0.85rem;font-size:0.78rem">Tautan gambar berlaku sementara. Muat ulang halaman jika gambar tidak tampil.</p>
+          </section>
+
+          <section class="card card-pad">
+            <div class="card-head"><h2>Informasi akun</h2></div>
+            <dl class="dl" style="grid-template-columns:1fr">
+              <div><dt>ID pelamar</dt><dd class="mono">{a.applicant_id}</dd></div>
+              <div><dt>Terdaftar</dt><dd>{dateTimeText(a.created_at)}</dd></div>
+              <div><dt>Terakhir diubah</dt><dd>{dateTimeText(a.updated_at)}</dd></div>
+            </dl>
+          </section>
+        </div>
+      </div>
+    </>
+  )}
+</AppLayout>

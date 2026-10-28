@@ -1,0 +1,22 @@
+---
+import Icon from './Icon.astro'
+interface Props {
+  label: string
+  value: string
+  hint?: string
+  icon: string
+  tone?: 'mint' | 'blue' | 'amber' | 'coral'
+  href?: string
+}
+const { label, value, hint, icon, tone = 'mint', href } = Astro.props
+const Tag = href ? 'a' : 'div'
+---
+
+<Tag class={`card kpi tone-${tone}`} href={href}>
+  <div class="kpi-top">
+    <span>{label}</span>
+    <span class="kpi-icon"><Icon name={icon} size={18} /></span>
+  </div>
+  <div class="kpi-value">{value}</div>
+  {hint && <div class="kpi-hint">{hint}</div>}
+</Tag>

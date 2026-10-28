@@ -1,0 +1,86 @@
+---
+import Base from '../layouts/Base.astro'
+import { getEnv } from '../lib/env'
+import { SESSION_COOKIE, SESSION_TTL, createSession, sameText, verifyPassword, DUMMY_HASH, safeNext, lockRemaining, recordFailure, clearFailures } from '../lib/auth'
+
+const env = getEnv(Astro.locals)
+const next = safeNext(Astro.url.searchParams.get('next'))
+
+if (Astro.locals.user) return Astro.redirect(next)
+
+let error = ''
+let email = ''
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData()
+  email = String(form.get('email') ?? '').trim()
+  const password = String(form.get('password') ?? '')
+  const target = safeNext(String(form.get('next') ?? '/'))
+  const ip = Astro.request.headers.get('CF-Connecting-IP') ?? 'unknown'
+
+  if (await lockRemaining(env.LOGIN_KV, ip)) {
+    error = 'Terlalu banyak percobaan gagal. Coba lagi dalam 15 menit.'
+  } else {
+    // Selalu menjalankan PBKDF2 agar waktu respons tidak membocorkan apakah email benar.
+    const emailOk = sameText(email, env.ADMIN_EMAIL)
+    const passwordOk = await verifyPassword(password, emailOk ? env.ADMIN_PASSWORD_HASH : DUMMY_HASH)
+
+    if (emailOk && passwordOk) {
+      await clearFailures(env.LOGIN_KV, ip)
+      Astro.cookies.set(SESSION_COOKIE, await createSession(env.SESSION_SECRET, env.ADMIN_EMAIL.trim().toLowerCase()), {
+        httpOnly: true,
+        secure: Astro.url.protocol === 'https:',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: SESSION_TTL,
+      })
+      return Astro.redirect(target, 303)
+    }
+
+    await recordFailure(env.LOGIN_KV, ip)
+    await new Promise((resolve) => setTimeout(resolve, 600)) // memperlambat tebakan beruntun
+    error = 'Email atau password salah.'
+  }
+  Astro.response.status = 401
+}
+---
+
+<Base title="Masuk · Konsol Pelamar">
+  <div class="auth">
+    <section class="auth-art" aria-hidden="true">
+      <div class="brand">
+        <span class="brand-mark"><img src="/logo.png" alt="" width="28" height="28" /></span>
+        <span class="brand-text"><strong>Konsol Pelamar</strong><small>Akses terbatas</small></span>
+      </div>
+      <svg viewBox="0 0 200 200" fill="none">
+        <circle cx="100" cy="100" r="92" stroke="currentColor" stroke-width="10" />
+        <circle cx="100" cy="100" r="62" stroke="currentColor" stroke-width="4" opacity=".6" />
+        <circle cx="100" cy="100" r="32" stroke="currentColor" stroke-width="2" opacity=".35" />
+      </svg>
+      <div>
+        <h2>Semua pelamar, satu layar.</h2>
+        <p>Pantau pendaftar dari seluruh perusahaan, saring berdasarkan etnis, pendidikan, dan lainnya.</p>
+      </div>
+    </section>
+
+    <section class="auth-form">
+      <form method="post" action={`/login?next=${encodeURIComponent(next)}`}>
+        <div>
+          <h1>Masuk</h1>
+          <p class="muted">Halaman ini khusus administrator. Tidak ada pendaftaran akun.</p>
+        </div>
+        {error && <div class="alert alert-error" role="alert">{error}</div>}
+        <input type="hidden" name="next" value={next} />
+        <div>
+          <label class="label" for="email">Email</label>
+          <input class="input" id="email" name="email" type="email" autocomplete="username" required value={email} autofocus />
+        </div>
+        <div>
+          <label class="label" for="password">Password</label>
+          <input class="input" id="password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Masuk</button>
+      </form>
+    </section>
+  </div>
+</Base>

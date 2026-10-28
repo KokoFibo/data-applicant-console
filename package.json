@@ -1,0 +1,22 @@
+{
+  "name": "yifang-admin-console",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro build && wrangler pages dev ./dist",
+    "deploy": "astro build && wrangler pages deploy ./dist",
+    "hash-password": "node scripts/hash-password.mjs"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^12.0.0",
+    "@fontsource-variable/bricolage-grotesque": "^5.1.0",
+    "@fontsource-variable/public-sans": "^5.1.0",
+    "astro": "^5.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,16 @@
+name = "yifang-admin-console"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./dist"
+
+[vars]
+# Alamat Laravel portal. Boleh domain perusahaan mana pun (API admin tidak bergantung domain).
+API_BASE_URL = "https://payroll-applicant.yifang.co.id"
+
+# Rahasia (ADMIN_EMAIL, ADMIN_PASSWORD_HASH, SESSION_SECRET, API_TOKEN) TIDAK ditulis di sini.
+# Simpan lewat:  npx wrangler pages secret put NAMA_VARIABEL --project-name yifang-admin-console
+
+# Opsional: pembatas percobaan login. Buat dulu:  npx wrangler kv namespace create LOGIN_KV
+# [[kv_namespaces]]
+# binding = "LOGIN_KV"
+# id = "ISI_ID_KV_DI_SINI"

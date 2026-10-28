@@ -1,0 +1,10 @@
+---
+import { STATUS_LABEL } from '../lib/format'
+interface Props {
+  status: number
+}
+const { status } = Astro.props
+const cls = status >= 2 ? 'b-done' : status === 1 ? 'b-sent' : 'b-draft'
+---
+
+<span class={`badge ${cls}`}>{STATUS_LABEL[status] ?? `Status ${status}`}</span>

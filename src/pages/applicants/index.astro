@@ -1,0 +1,167 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro'
+import Icon from '../../components/Icon.astro'
+import FilterPanel from '../../components/FilterPanel.astro'
+import Pager from '../../components/Pager.astro'
+import CompanyChip from '../../components/CompanyChip.astro'
+import StatusBadge from '../../components/StatusBadge.astro'
+import { getEnv } from '../../lib/env'
+import { getMeta, listApplicants, ApiError } from '../../lib/api'
+import type { MetaResponse, ListResponse } from '../../lib/api'
+import { readFilters, toApiParams, toQuery, patch, chips, activeCount, SORTS, PER_PAGE } from '../../lib/filters'
+import type { MultiKey } from '../../lib/filters'
+import { num, initials, hueOf, dateTimeText, dateText } from '../../lib/format'
+
+const env = getEnv(Astro.locals)
+const filters = readFilters(Astro.url)
+
+let meta: MetaResponse | undefined
+let list: ListResponse | undefined
+let error = ''
+
+try {
+  ;[meta, list] = await Promise.all([getMeta(env), listApplicants(env, toApiParams(filters))])
+} catch (e) {
+  error = e instanceof ApiError ? e.message : 'Terjadi kesalahan tak terduga saat memuat data.'
+}
+
+// Halaman di luar jangkauan (mis. setelah filter diperketat): arahkan ke halaman terakhir
+if (list && filters.page > list.meta.last_page) {
+  return Astro.redirect(`/applicants${toQuery(patch(filters, { page: list.meta.last_page }))}`)
+}
+
+const labelOf = (key: MultiKey, value: string): string => {
+  if (key === 'company') {
+    if (value === '_none') return 'Belum ditentukan'
+    return meta?.companies.find((c) => c.code === value)?.name ?? value
+  }
+  return meta?.facets[key]?.find((o) => o.value === value)?.label ?? value
+}
+const activeChips = chips(filters, labelOf)
+const exportHref = `/export.csv${toQuery({ ...filters, page: 1 })}`
+
+// Tautan urutan untuk header kolom
+const sortHref = (key: string) => {
+  const dir = filters.sort === key && filters.dir === 'asc' ? 'desc' : 'asc'
+  return `/applicants${toQuery(patch(filters, { sort: key, dir }))}`
+}
+const arrow = (key: string) => (filters.sort === key ? (filters.dir === 'asc' ? '↑' : '↓') : '')
+---
+
+<AppLayout title="Pelamar" active="applicants">
+  <div class="page-head">
+    <div>
+      <h1>Pelamar</h1>
+      <p class="muted">Saring berdasarkan perusahaan, etnis, pendidikan, dan lainnya.</p>
+    </div>
+    <div class="actions">
+      <a class="btn" href={exportHref}><Icon name="download" size={16} /> Ekspor CSV{activeCount(filters) > 0 ? ' (sesuai filter)' : ''}</a>
+    </div>
+  </div>
+
+  {error && (
+    <div class="alert alert-error" role="alert">
+      <strong>Data tidak dapat dimuat.</strong> {error} <a class="link" href={`/applicants${toQuery(filters)}`}>Coba lagi</a>
+    </div>
+  )}
+
+  {meta && list && (
+    <div class="list-layout">
+      <input type="checkbox" id="ftoggle" class="sr-only" aria-label="Tampilkan filter" />
+      <label for="ftoggle" class="btn filter-toggle"><Icon name="filter" size={16} /> Filter{activeCount(filters) > 0 ? ` (${activeCount(filters)})` : ''}</label>
+
+      <FilterPanel filters={filters} meta={meta} />
+
+      <div class="stack">
+        <div class="card toolbar">
+          <div class="search">
+            <Icon name="search" size={16} />
+            <input class="input" type="search" name="q" form="f" value={filters.q} placeholder="Cari nama, email, HP, NIK, kampus…" aria-label="Cari pelamar" maxlength="100" />
+          </div>
+          <select class="input select" name="sort" form="f" aria-label="Urutkan berdasarkan">
+            {Object.entries(SORTS).map(([key, label]) => <option value={key} selected={filters.sort === key}>{label}</option>)}
+          </select>
+          <select class="input select" name="dir" form="f" aria-label="Arah urutan">
+            <option value="desc" selected={filters.dir === 'desc'}>Besar ke kecil / baru ke lama</option>
+            <option value="asc" selected={filters.dir === 'asc'}>Kecil ke besar / lama ke baru</option>
+          </select>
+          <select class="input select" name="per_page" form="f" aria-label="Jumlah per halaman">
+            {PER_PAGE.map((n) => <option value={n} selected={filters.per_page === n}>{n} / halaman</option>)}
+          </select>
+          <button class="btn btn-accent" type="submit" form="f">Cari</button>
+        </div>
+
+        {activeChips.length > 0 && (
+          <div class="chips" aria-label="Filter aktif">
+            {activeChips.map((c) => (
+              <span class="chip-active"><small>{c.group}:</small> {c.label}
+                <a href={`/applicants${toQuery(c.remove)}`} aria-label={`Hapus filter ${c.group} ${c.label}`}><Icon name="x" size={12} /></a>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div class="count-line">
+          <span>
+            {list.meta.total === 0
+              ? 'Tidak ada pelamar yang cocok.'
+              : <>Menampilkan <strong>{num(list.meta.from)}–{num(list.meta.to)}</strong> dari <strong>{num(list.meta.total)}</strong> pelamar</>}
+          </span>
+        </div>
+
+        <div class="card">
+          {list.data.length === 0 ? (
+            <div class="empty">
+              <Icon name="search" size={28} />
+              <h3>Tidak ada hasil</h3>
+              <p>Coba kurangi filter atau ubah kata kunci pencarian.</p>
+              {activeCount(filters) > 0 && <a class="btn" href="/applicants">Reset semua filter</a>}
+            </div>
+          ) : (
+            <>
+              <div class="table-wrap">
+                <table class="data">
+                  <thead>
+                    <tr>
+                      <th><a href={sortHref('nama')}>Pelamar {arrow('nama')}</a></th>
+                      <th><a href={sortHref('company')}>Perusahaan {arrow('company')}</a></th>
+                      <th><a href={sortHref('etnis')}>Etnis {arrow('etnis')}</a></th>
+                      <th><a href={sortHref('pendidikan')}>Pendidikan {arrow('pendidikan')}</a></th>
+                      <th><a href={sortHref('tgl_lahir')}>Umur {arrow('tgl_lahir')}</a></th>
+                      <th><a href={sortHref('status')}>Status {arrow('status')}</a></th>
+                      <th>Dokumen</th>
+                      <th><a href={sortHref('created_at')}>Mendaftar {arrow('created_at')}</a></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.data.map((a) => (
+                      <tr>
+                        <td class="cell-main">
+                          <div class="person">
+                            <span class="avatar" style={`--h:${a.company ? hueOf(a.company.code) : 200}`}>{initials(a.nama ?? a.email)}</span>
+                            <a href={`/applicants/${a.id}`}>
+                              <strong>{a.nama ?? 'Belum mengisi nama'}</strong>
+                              <small>{a.email}</small>
+                            </a>
+                          </div>
+                        </td>
+                        <td data-label="Perusahaan"><CompanyChip company={a.company} /></td>
+                        <td data-label="Etnis">{a.etnis ?? '-'}</td>
+                        <td data-label="Pendidikan">{a.pendidikan ?? '-'}{a.jurusan ? <small class="muted"> · {a.jurusan}</small> : null}</td>
+                        <td data-label="Umur" title={a.tgl_lahir ? dateText(a.tgl_lahir) : ''}>{a.umur !== null ? `${a.umur} th` : '-'}</td>
+                        <td data-label="Status"><StatusBadge status={a.status} /></td>
+                        <td data-label="Dokumen">{a.files_count} file</td>
+                        <td data-label="Mendaftar" class="muted">{dateTimeText(a.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pager filters={filters} current={list.meta.current_page} last={list.meta.last_page} />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )}
+</AppLayout>

@@ -1,0 +1,33 @@
+---
+import { num } from '../lib/format'
+interface Item {
+  label: string
+  n: number
+  href?: string
+  sub?: string
+}
+interface Props {
+  items: Item[]
+  color?: string
+  empty?: string
+}
+const { items, color = 'var(--c0)', empty = 'Belum ada data.' } = Astro.props
+const max = Math.max(1, ...items.map((i) => i.n))
+---
+
+{items.length === 0 ? (
+  <p class="muted">{empty}</p>
+) : (
+  <div class="bars">
+    {items.map((it) => {
+      const Label = it.href ? 'a' : 'span'
+      return (
+        <div class="bar-row">
+          <Label class="bar-label" href={it.href} title={it.label}>{it.label}</Label>
+          <div class="bar-track"><div class="bar-fill" style={`width:${(it.n / max) * 100}%;--bar:${color}`}></div></div>
+          <span class="bar-val">{num(it.n)}{it.sub && <span class="bar-sub"> {it.sub}</span>}</span>
+        </div>
+      )
+    })}
+  </div>
+)}

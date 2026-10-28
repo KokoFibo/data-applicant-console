@@ -1,0 +1,7 @@
+# Salin menjadi .dev.vars (jangan di-commit) untuk `npm run dev`.
+# Nilai yang memuat tanda $ WAJIB diapit kutip tunggal.
+ADMIN_EMAIL=anda@contoh.com
+ADMIN_PASSWORD_HASH='hasil-dari-npm-run-hash-password'
+SESSION_SECRET=string-acak-minimal-32-karakter
+API_BASE_URL=http://127.0.0.1:8000
+API_TOKEN=token-admin-api-dari-langkah-laravel

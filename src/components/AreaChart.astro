@@ -1,0 +1,42 @@
+---
+import { dayLabel, num } from '../lib/format'
+interface Props {
+  series: { date: string; n: number }[]
+}
+const { series } = Astro.props
+const W = 640, H = 210, PX = 10, PT = 14, PB = 28
+const max = Math.max(1, ...series.map((s) => s.n))
+const top = max <= 4 ? 4 : Math.ceil(max / 4) * 4
+const x = (i: number) => PX + (i * (W - 2 * PX)) / Math.max(1, series.length - 1)
+const y = (n: number) => PT + (H - PT - PB) * (1 - n / top)
+const line = series.map((s, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(s.n).toFixed(1)}`).join(' ')
+const area = series.length ? `${line} L${x(series.length - 1).toFixed(1)} ${H - PB} L${x(0).toFixed(1)} ${H - PB} Z` : ''
+const ticks = [0, 1, 2, 3, 4].map((i) => (top * i) / 4)
+const labelAt = [0, 7, 14, 21, series.length - 1].filter((i) => i >= 0 && i < series.length)
+---
+
+<svg class="area" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Grafik pendaftaran 30 hari terakhir">
+  <defs>
+    <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2bd9a5" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#2bd9a5" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  {ticks.map((t) => (
+    <>
+      <line class="grid-line" x1={PX} x2={W - PX} y1={y(t)} y2={y(t)} />
+      <text class="axis" x={PX} y={y(t) - 4}>{Math.round(t)}</text>
+    </>
+  ))}
+  {area && <path d={area} fill="url(#areaFill)" />}
+  {line && <path d={line} fill="none" stroke="#14b88a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />}
+  {series.map((s, i) => (
+    <>
+      <circle class="hit" cx={x(i)} cy={y(s.n)} r="9" tabindex="0"><title>{dayLabel(s.date)}: {num(s.n)} pelamar</title></circle>
+      <circle class="dot" cx={x(i)} cy={y(s.n)} r="4" />
+    </>
+  ))}
+  {labelAt.map((i) => (
+    <text class="axis" x={x(i)} y={H - 8} text-anchor={i === 0 ? 'start' : i === series.length - 1 ? 'end' : 'middle'}>{dayLabel(series[i].date)}</text>
+  ))}
+</svg>

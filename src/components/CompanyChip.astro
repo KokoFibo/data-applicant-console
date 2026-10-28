@@ -1,0 +1,13 @@
+---
+import { hueOf } from '../lib/format'
+interface Props {
+  company: { code: string; name: string } | null
+}
+const { company } = Astro.props
+---
+
+{company ? (
+  <span class="chip" style={`--h:${hueOf(company.code)}`}><i></i>{company.name}</span>
+) : (
+  <span class="chip chip-none"><i></i>Belum ditentukan</span>
+)}

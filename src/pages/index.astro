@@ -1,0 +1,168 @@
+---
+import AppLayout from '../layouts/AppLayout.astro'
+import Icon from '../components/Icon.astro'
+import StatCard from '../components/StatCard.astro'
+import AreaChart from '../components/AreaChart.astro'
+import BarList from '../components/BarList.astro'
+import Donut from '../components/Donut.astro'
+import CompanyChip from '../components/CompanyChip.astro'
+import StatusBadge from '../components/StatusBadge.astro'
+import { getEnv } from '../lib/env'
+import { getSummary, listApplicants, ApiError } from '../lib/api'
+import type { SummaryResponse, ListResponse } from '../lib/api'
+import { emptyFilters, toApiParams } from '../lib/filters'
+import { num, pct, dateTimeText, initials, hueOf } from '../lib/format'
+
+const env = getEnv(Astro.locals)
+let summary: SummaryResponse | undefined
+let recent: ListResponse | undefined
+let error = ''
+
+try {
+  ;[summary, recent] = await Promise.all([getSummary(env), listApplicants(env, toApiParams(emptyFilters(), { per_page: 6 }))])
+} catch (e) {
+  error = e instanceof ApiError ? e.message : 'Terjadi kesalahan tak terduga saat memuat data.'
+}
+
+const today = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' }).format(new Date())
+const t = summary?.totals
+const sentPct = t ? pct(t.sent, t.total) : 0
+const verifiedPct = t ? pct(t.verified, t.total) : 0
+const maxCompany = Math.max(1, ...(summary?.by_company.map((x) => x.total) ?? [0]))
+const d = summary?.distributions
+const statusItems = t
+  ? [
+      { label: 'Sudah dikirim', n: t.sent },
+      { label: 'Belum dikirim', n: Math.max(0, t.total - t.sent) },
+    ]
+  : []
+---
+
+<AppLayout title="Dasbor" active="dashboard">
+  <div class="page-head">
+    <div>
+      <h1>Ringkasan pelamar</h1>
+      <p class="muted">{today}</p>
+    </div>
+    <div class="actions">
+      <a class="btn" href="/export.csv"><Icon name="download" size={16} /> Ekspor semua (CSV)</a>
+      <a class="btn btn-primary" href="/applicants"><Icon name="users" size={16} /> Lihat semua pelamar</a>
+    </div>
+  </div>
+
+  {error && (
+    <div class="alert alert-error" role="alert">
+      <strong>Data tidak dapat dimuat.</strong> {error} <a class="link" href="/">Coba lagi</a>
+    </div>
+  )}
+
+  {summary && t && (
+    <>
+      {t.unassigned > 0 && (
+        <div class="alert alert-warn">
+          <strong>{num(t.unassigned)} pelamar lama</strong> belum ditentukan perusahaannya. <a class="link" href="/applicants?company=_none">Lihat daftarnya</a>
+        </div>
+      )}
+
+      <section class="grid g4" aria-label="Angka utama">
+        <StatCard label="Total pelamar" value={num(t.total)} hint="Semua perusahaan" icon="users" href="/applicants" />
+        <StatCard label="Sudah mengirim data" value={num(t.sent)} hint={`${sentPct}% dari total`} icon="check" tone="blue" href="/applicants?status=sent" />
+        <StatCard label="Email terverifikasi" value={num(t.verified)} hint={`${verifiedPct}% dari total`} icon="mail" tone="amber" href="/applicants?verified=yes" />
+        <StatCard label="Pendaftar 7 hari terakhir" value={num(t.last7)} hint="Termasuk yang belum mengirim" icon="trending" tone="coral" />
+      </section>
+
+      <section class="grid g-wide">
+        <div class="card card-pad">
+          <div class="card-head">
+            <div>
+              <h2>Pendaftaran 30 hari terakhir</h2>
+              <p class="muted">{num(summary.series.reduce((a, s) => a + s.n, 0))} pelamar baru</p>
+            </div>
+          </div>
+          <AreaChart series={summary.series} />
+        </div>
+        <div class="card card-pad">
+          <div class="card-head"><h2>Status pengiriman</h2></div>
+          <Donut items={statusItems} centerLabel="pelamar" />
+        </div>
+      </section>
+
+      <section class="grid g3">
+        <div class="card card-pad">
+          <div class="card-head"><h2>Per perusahaan</h2></div>
+          {summary.by_company.length === 0 ? (
+            <p class="muted">Belum ada perusahaan.</p>
+          ) : (
+            <div class="bars">
+              {summary.by_company.map((c) => {
+                return (
+                  <div class="bar-row">
+                    <a class="bar-label" href={`/applicants?company=${encodeURIComponent(c.code)}`} title={c.name}>{c.name}</a>
+                    <div class="bar-track" title={`${c.sent} sudah kirim dari ${c.total}`}>
+                      <div class="bar-fill" style={`width:${(c.sent / maxCompany) * 100}%;--bar:var(--c0)`}></div>
+                      <div class="bar-fill" style={`width:${((c.total - c.sent) / maxCompany) * 100}%;--bar:var(--c2)`}></div>
+                    </div>
+                    <span class="bar-val">{num(c.total)}</span>
+                  </div>
+                )
+              })}
+              <p class="muted" style="font-size:0.78rem"><span style="color:var(--c0)">■</span> sudah dikirim &nbsp; <span style="color:var(--c2)">■</span> belum dikirim</p>
+            </div>
+          )}
+        </div>
+        <div class="card card-pad">
+          <div class="card-head"><h2>Etnis</h2></div>
+          <BarList items={(d?.etnis ?? []).map((i) => ({ label: i.label, n: i.n, href: `/applicants?etnis=${encodeURIComponent(i.label)}` }))} color="var(--c1)" />
+        </div>
+        <div class="card card-pad">
+          <div class="card-head"><h2>Pendidikan terakhir</h2></div>
+          <BarList items={(d?.pendidikan ?? []).map((i) => ({ label: i.label, n: i.n, href: `/applicants?pendidikan=${encodeURIComponent(i.label)}` }))} color="var(--c4)" />
+        </div>
+      </section>
+
+      <section class="grid g2">
+        <div class="card card-pad">
+          <div class="card-head"><h2>Jenis kelamin</h2></div>
+          <Donut items={d?.gender ?? []} centerLabel="pelamar" />
+        </div>
+        <div class="card card-pad">
+          <div class="card-head"><h2>Agama</h2></div>
+          <BarList items={(d?.agama ?? []).map((i) => ({ label: i.label, n: i.n, href: `/applicants?agama=${encodeURIComponent(i.label)}` }))} color="var(--c5)" />
+        </div>
+      </section>
+    </>
+  )}
+
+  {recent && (
+    <section class="card">
+      <div class="card-head" style="padding:1.25rem 1.25rem 0">
+        <h2>Pendaftar terbaru</h2>
+        <a class="link" href="/applicants">Lihat semua</a>
+      </div>
+      {recent.data.length === 0 ? (
+        <div class="empty">Belum ada pelamar.</div>
+      ) : (
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Pelamar</th><th>Perusahaan</th><th>Status</th><th>Mendaftar</th></tr></thead>
+            <tbody>
+              {recent.data.map((a) => (
+                <tr>
+                  <td class="cell-main">
+                    <div class="person">
+                      <span class="avatar" style={`--h:${a.company ? hueOf(a.company.code) : 200}`}>{initials(a.nama ?? a.email)}</span>
+                      <a href={`/applicants/${a.id}`}><strong>{a.nama ?? 'Belum mengisi nama'}</strong><small>{a.email}</small></a>
+                    </div>
+                  </td>
+                  <td data-label="Perusahaan"><CompanyChip company={a.company} /></td>
+                  <td data-label="Status"><StatusBadge status={a.status} /></td>
+                  <td data-label="Mendaftar" class="muted">{dateTimeText(a.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )}
+</AppLayout>
